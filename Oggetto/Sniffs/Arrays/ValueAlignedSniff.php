@@ -17,7 +17,7 @@ class Oggetto_Sniffs_Arrays_ValueAlignedSniff implements PHP_CodeSniffer_Sniff
         return array(
 
             T_ARRAY,
-//            T_OPEN_SHORT_ARRAY
+            T_OPEN_SHORT_ARRAY
         );
     }
 
@@ -32,29 +32,50 @@ class Oggetto_Sniffs_Arrays_ValueAlignedSniff implements PHP_CodeSniffer_Sniff
     public function process(PHP_CodeSniffer_File $phpcsFile, $stackPtr)
     {
         $tokens = $phpcsFile->getTokens(); // All tokens
-        print_r($tokens);
-        exit;
+//        echo $stackPtr . PHP_EOL;
 
-        $endExpression = $tokens[$stackPtr]['parenthesis_closer'];
+        if($tokens[$stackPtr]['code'] == T_OPEN_SHORT_ARRAY) {
+            $endExpression = $tokens[$stackPtr]['bracket_closer'];
+        } else {
+            $endExpression = $tokens[$stackPtr]['parenthesis_closer'];
+        }
 
-        $indexArray = $phpcsFile->findNext(T_ARRAY, $stackPtr + 2, $endExpression);
+        if($phpcsFile->findNext(T_DOUBLE_ARROW, $stackPtr, $endExpression) == false)
+            return;
+
+
+        $indexArray = $phpcsFile->findNext([T_ARRAY, T_OPEN_SHORT_ARRAY], $stackPtr + 1, $endExpression);
         while($indexArray !== false) {
-            $withDelete = $tokens[$indexArray]['parenthesis_opener'] + 1;
-            $onDelete = $tokens[$indexArray]['parenthesis_closer'];
+            if($tokens[$indexArray]['code'] == T_OPEN_SHORT_ARRAY) {
+                $withDelete = $tokens[$indexArray]['bracket_opener'] + 1;
+                $onDelete = $tokens[$indexArray]['bracket_closer'];
+            } else {
+                $withDelete = $tokens[$indexArray]['parenthesis_opener'] + 1;
+                $onDelete = $tokens[$indexArray]['parenthesis_closer'];
+            }
+
             for($i = $withDelete; $i < $onDelete; ++$i) {
                 unset($tokens[$i]);
             }
-            $indexArray = $phpcsFile->findNext(T_ARRAY, $onDelete, $endExpression);
+            $indexArray = $phpcsFile->findNext([T_ARRAY, T_OPEN_SHORT_ARRAY], $onDelete, $endExpression);
         }
 
-        $indexNumber = $maxIndexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER], ($stackPtr + 2), $endExpression);
+
+        $indexNumber = $maxIndexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER], ($stackPtr + 1), $endExpression);
         while($indexNumber != false) {
             if((array_key_exists($indexNumber, $tokens)) && (strlen($tokens[$indexNumber]['content']) > strlen($tokens[$maxIndexNumber]['content']))) {
                 $maxIndexNumber = $indexNumber;
             }
 
-            $indexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER],
-                $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER, T_ARRAY], $indexNumber + 1, $endExpression) + 1, $endExpression);
+            $shift = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER, T_ARRAY, T_OPEN_SHORT_ARRAY], $indexNumber + 1, $endExpression);
+            if($shift !== false) {
+                $indexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER],
+                   $shift + 1, $endExpression);
+            } else {
+                $indexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER],
+                    $indexNumber + 1, $endExpression);
+            }
+
         }
 
         $indexDoubleArrow = $phpcsFile->findNext(T_DOUBLE_ARROW, $stackPtr, $endExpression);
@@ -80,7 +101,7 @@ class Oggetto_Sniffs_Arrays_ValueAlignedSniff implements PHP_CodeSniffer_Sniff
             $indexDoubleArrow = $phpcsFile->findNext(T_DOUBLE_ARROW, $indexDoubleArrow + 1, $endExpression);
 
             $indexNumber = $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER],
-                $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER, T_ARRAY], $indexNumber + 1, $endExpression) + 1, $endExpression);
+                $phpcsFile->findNext([T_CONSTANT_ENCAPSED_STRING, T_LNUMBER, T_ARRAY, T_OPEN_SHORT_ARRAY], $indexNumber + 1, $endExpression) + 1, $endExpression);
 
         }
 
